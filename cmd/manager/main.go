@@ -9,7 +9,6 @@ import (
 
 	"github.com/PolarGeospatialCenter/local-storage-operator/pkg/apis"
 	"github.com/PolarGeospatialCenter/local-storage-operator/pkg/controller"
-	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	"github.com/operator-framework/operator-sdk/pkg/leader"
 	"github.com/operator-framework/operator-sdk/pkg/ready"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
@@ -39,12 +38,6 @@ func main() {
 
 	printVersion()
 
-	namespace, err := k8sutil.GetWatchNamespace()
-	if err != nil {
-		log.Error(err, "failed to get watch namespace")
-		os.Exit(1)
-	}
-
 	// Get a config to talk to the apiserver
 	cfg, err := config.GetConfig()
 	if err != nil {
@@ -64,7 +57,7 @@ func main() {
 	defer r.Unset()
 
 	// Create a new Cmd to provide shared dependencies and start components
-	mgr, err := manager.New(cfg, manager.Options{Namespace: namespace})
+	mgr, err := manager.New(cfg, manager.Options{})
 	if err != nil {
 		log.Error(err, "")
 		os.Exit(1)
