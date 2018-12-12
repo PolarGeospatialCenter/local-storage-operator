@@ -1,0 +1,13 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: storagepreparejobs.localstorage.k8s.pgc.umn.edu
+spec:
+  group: localstorage.k8s.pgc.umn.edu
+  names:
+    kind: StoragePrepareJob
+    listKind: StoragePrepareJobList
+    plural: storagepreparejobs
+    singular: storagepreparejob
+  scope: Namespaced
+  version: v1alpha1

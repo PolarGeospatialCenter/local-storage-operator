@@ -1,0 +1,7 @@
+apiVersion: localstorage.k8s.pgc.umn.edu/v1alpha1
+kind: StoragePrepareJob
+metadata:
+  name: example-storagepreparejob
+spec:
+  # Add fields here
+  size: 3
