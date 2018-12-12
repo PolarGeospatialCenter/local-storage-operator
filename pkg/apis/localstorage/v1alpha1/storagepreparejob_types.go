@@ -1,7 +1,13 @@
 package v1alpha1
 
 import (
+	"fmt"
+
+	"github.com/PolarGeospatialCenter/local-storage-operator/pkg/pvctemplate"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -9,14 +15,23 @@ import (
 
 // StoragePrepareJobSpec defines the desired state of StoragePrepareJob
 type StoragePrepareJobSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
+	Pv  corev1.PersistentVolume      `json:"pv"`
+	Pvc corev1.PersistentVolumeClaim `json:"pvc"`
+	Job batchv1.Job                  `json:"job"`
 }
+
+type StoragePrepareJobPhase string
+
+const (
+	StoragePrepareJobPhasePending   StoragePrepareJobPhase = "pending"
+	StoragePrepareJobPhaseRunning   StoragePrepareJobPhase = "running"
+	StoragePrepareJobPhaseFailed    StoragePrepareJobPhase = "failed"
+	StoragePrepareJobPhaseSucceeded StoragePrepareJobPhase = "succeeded"
+)
 
 // StoragePrepareJobStatus defines the observed state of StoragePrepareJob
 type StoragePrepareJobStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
+	Phase StoragePrepareJobPhase `json:"phase"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -29,6 +44,71 @@ type StoragePrepareJob struct {
 
 	Spec   StoragePrepareJobSpec   `json:"spec,omitempty"`
 	Status StoragePrepareJobStatus `json:"status,omitempty"`
+}
+
+type PreparableStorageObject interface {
+	AsPv(string) *corev1.PersistentVolume
+	GetName() string
+	GetEnv(string) []corev1.EnvVar
+}
+
+func NewStoragePrepareJob(template *StoragePrepareJobTemplate, d PreparableStorageObject, namespace string) *StoragePrepareJob {
+	spj := &StoragePrepareJob{}
+	spj.APIVersion = "localstorage.k8s.pgc.umn.edu/v1alpha1"
+	spj.Kind = "StoragePrepareJob"
+	spj.Name = d.GetName()
+	spj.Namespace = namespace
+	spj.Status.Phase = "pending"
+
+	prepPv := d.AsPv("prepare-local-storage")
+	prepPv.Name = fmt.Sprintf("prepare-%s", d.GetName())
+	prepPv.Labels = nil
+	prepPv.Annotations = nil
+	spj.Spec.Pv = *prepPv
+
+	prepPvc := pvctemplate.CreatePVC(template, *prepPv)
+	prepPvc.Namespace = namespace
+	prepPvc.Annotations = nil
+	prepPvc.Spec.StorageClassName = &prepPv.Spec.StorageClassName
+	spj.Spec.Pvc = *prepPvc
+
+	job := template.CreatePrepareJob(*prepPvc, d.GetName())
+	job.Namespace = namespace
+
+	for i, _ := range job.Spec.Template.Spec.Containers {
+		job.Spec.Template.Spec.Containers[i].Env = append(job.Spec.Template.Spec.Containers[i].Env, d.GetEnv("STORAGE")...)
+	}
+
+	spj.Spec.Job = *job
+
+	return spj
+}
+
+func (s *StoragePrepareJob) UpdateOwnerReferences() error {
+
+	if s.UID == "" {
+		return fmt.Errorf("uid must not be set")
+	}
+
+	or := &metav1.OwnerReference{}
+	or.APIVersion = s.APIVersion
+	or.Kind = s.Kind
+	or.Name = s.Name
+	or.UID = s.UID
+
+	s.Spec.Pv.OwnerReferences = append(s.Spec.Pv.OwnerReferences, *or)
+	s.Spec.Pvc.OwnerReferences = append(s.Spec.Pvc.OwnerReferences, *or)
+	s.Spec.Job.OwnerReferences = append(s.Spec.Job.OwnerReferences, *or)
+
+	return nil
+}
+
+func (s *StoragePrepareJob) GetObjects() []runtime.Object {
+	return []runtime.Object{
+		&s.Spec.Pv,
+		&s.Spec.Pvc,
+		&s.Spec.Job,
+	}
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
