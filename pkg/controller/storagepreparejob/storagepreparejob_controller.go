@@ -2,16 +2,14 @@ package storagepreparejob
 
 import (
 	"context"
+	"fmt"
 
 	localstoragev1alpha1 "github.com/PolarGeospatialCenter/local-storage-operator/pkg/apis/localstorage/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -99,54 +97,45 @@ func (r *ReconcileStoragePrepareJob) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	}
 
-	// Define a new Pod object
-	pod := newPodForCR(instance)
+	switch instance.Status.Phase {
+	case localstoragev1alpha1.StoragePrepareJobPhasePending:
+		instance.UpdateOwnerReferences()
 
-	// Set StoragePrepareJob instance as the owner and controller
-	if err := controllerutil.SetControllerReference(instance, pod, r.scheme); err != nil {
-		return reconcile.Result{}, err
-	}
-
-	// Check if this Pod already exists
-	found := &corev1.Pod{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, found)
-	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating a new Pod", "Pod.Namespace", pod.Namespace, "Pod.Name", pod.Name)
-		err = r.client.Create(context.TODO(), pod)
-		if err != nil {
-			return reconcile.Result{}, err
+		for _, object := range instance.GetObjects() {
+			err := r.client.Create(context.TODO(), object)
+			if err != nil {
+				return reconcile.Result{}, fmt.Errorf("error creating %s while preparing %s: %v", object.GetObjectKind(), instance.GetName(), err)
+			}
 		}
 
-		// Pod created successfully - don't requeue
+		instance.Status.Phase = localstoragev1alpha1.StoragePrepareJobPhaseRunning
+		return reconcile.Result{}, r.client.Update(context.TODO(), instance)
+
+	case localstoragev1alpha1.StoragePrepareJobPhaseRunning:
+		job := &instance.Spec.Job
+		err := r.client.Get(context.TODO(), request.NamespacedName, job)
+		if err != nil {
+			return reconcile.Result{}, fmt.Errorf("Error getting job for %s even though status is running: %v", instance.Name, err)
+		}
+
+		if job.Status.Active > 0 {
+			return reconcile.Result{}, nil
+		}
+
+		if job.Status.Failed > 0 {
+			instance.Status.Phase = localstoragev1alpha1.StoragePrepareJobPhaseFailed
+			return reconcile.Result{}, r.client.Update(context.TODO(), instance)
+		}
+
+		if job.Status.Succeeded > 0 {
+			instance.Status.Phase = localstoragev1alpha1.StoragePrepareJobPhaseSucceeded
+			return reconcile.Result{}, r.client.Update(context.TODO(), instance)
+		}
+
+	default:
 		return reconcile.Result{}, nil
-	} else if err != nil {
-		return reconcile.Result{}, err
+
 	}
 
-	// Pod already exists - don't requeue
-	reqLogger.Info("Skip reconcile: Pod already exists", "Pod.Namespace", found.Namespace, "Pod.Name", found.Name)
 	return reconcile.Result{}, nil
-}
-
-// newPodForCR returns a busybox pod with the same name/namespace as the cr
-func newPodForCR(cr *localstoragev1alpha1.StoragePrepareJob) *corev1.Pod {
-	labels := map[string]string{
-		"app": cr.Name,
-	}
-	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cr.Name + "-pod",
-			Namespace: cr.Namespace,
-			Labels:    labels,
-		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name:    "busybox",
-					Image:   "busybox",
-					Command: []string{"sleep", "3600"},
-				},
-			},
-		},
-	}
 }
