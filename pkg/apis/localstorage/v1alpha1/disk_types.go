@@ -16,8 +16,9 @@ import (
 
 // DiskSpec defines the desired state of Disk
 type DiskSpec struct {
-	Info     DiskInfo     `json:"diskInfo"`
-	Location DiskLocation `json:"location"`
+	Info         DiskInfo     `json:"diskInfo"`
+	Location     DiskLocation `json:"location"`
+	StorageClass string       `json:"storageClass"`
 }
 
 type DiskInfo struct {
@@ -66,6 +67,17 @@ func (d *Disk) Init(name string) {
 
 	d.TypeMeta = typeMeta
 	d.ObjectMeta = objectMeta
+}
+
+func (d *Disk) GetStorageClass() string {
+	if d.Spec.StorageClass == "" {
+		return "local-storage"
+	}
+	return d.Spec.StorageClass
+}
+
+func (d *Disk) SetStorageClass(storageClass string) {
+	d.Spec.StorageClass = storageClass
 }
 
 //Equals checks if a disk is equal to another disk.
@@ -151,7 +163,7 @@ func (d Disk) devicePath() string {
 	return fmt.Sprintf("/dev/disk/by-id/wwn-%s", d.Spec.Info.Wwn)
 }
 
-func (d *Disk) AsPv(storageClass string) *corev1.PersistentVolume {
+func (d *Disk) AsPv() *corev1.PersistentVolume {
 	pv := &corev1.PersistentVolume{}
 	volumeMode := corev1.PersistentVolumeBlock
 	reclaimPolicy := corev1.PersistentVolumeReclaimRetain
@@ -168,7 +180,7 @@ func (d *Disk) AsPv(storageClass string) *corev1.PersistentVolume {
 	pv.Spec.VolumeMode = &volumeMode
 	pv.Spec.AccessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
 	pv.Spec.PersistentVolumeReclaimPolicy = reclaimPolicy
-	pv.Spec.StorageClassName = storageClass
+	pv.Spec.StorageClassName = d.GetStorageClass()
 	pv.Spec.Local = &corev1.LocalVolumeSource{
 		Path: d.devicePath(),
 	}

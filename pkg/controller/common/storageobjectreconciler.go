@@ -37,7 +37,7 @@ func (r *StorageObjectReconciler) Reconcile(obj StorageObject) (reconcile.Result
 }
 
 func (r *StorageObjectReconciler) createManagedPv(obj StorageObject) error {
-	pv := obj.AsPv("local-storage")
+	pv := obj.AsPv()
 	existingPv := pv.DeepCopy()
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: existingPv.GetName()}, existingPv)
 	if err != nil && !errors.IsNotFound(err) {

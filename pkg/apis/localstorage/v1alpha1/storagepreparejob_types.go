@@ -47,7 +47,8 @@ type StoragePrepareJob struct {
 }
 
 type PreparableStorageObject interface {
-	AsPv(string) *corev1.PersistentVolume
+	AsPv() *corev1.PersistentVolume
+	SetStorageClass(string)
 	GetName() string
 	GetEnv(string) []corev1.EnvVar
 }
@@ -60,7 +61,8 @@ func NewStoragePrepareJob(template *StoragePrepareJobTemplate, d PreparableStora
 	spj.Namespace = namespace
 	spj.Status.Phase = "pending"
 
-	prepPv := d.AsPv("prepare-local-storage")
+	d.SetStorageClass("prepare-local-storage")
+	prepPv := d.AsPv()
 	prepPv.Name = fmt.Sprintf("prepare-%s", d.GetName())
 	prepPv.Labels = nil
 	prepPv.Annotations = nil

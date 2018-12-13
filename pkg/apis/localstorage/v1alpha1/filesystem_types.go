@@ -19,6 +19,7 @@ type FilesystemSpec struct {
 	MountPath    string            `json:"mountPath"`
 	MountOptions string            `json:"mountOptions"`
 	MountEnabled bool              `json:"mountEnabled"`
+	StorageClass string            `json:"storageClass"`
 	Capacity     resource.Quantity `json:"capacity"`
 }
 
@@ -28,7 +29,7 @@ type FilesystemStatus struct {
 	Mounted      bool                `json:"mounted"`
 }
 
-func (f *Filesystem) AsPv(storageClass string) *corev1.PersistentVolume {
+func (f *Filesystem) AsPv() *corev1.PersistentVolume {
 	pv := &corev1.PersistentVolume{}
 	volumeMode := corev1.PersistentVolumeFilesystem
 	reclaimPolicy := corev1.PersistentVolumeReclaimRetain
@@ -45,7 +46,7 @@ func (f *Filesystem) AsPv(storageClass string) *corev1.PersistentVolume {
 	pv.Spec.VolumeMode = &volumeMode
 	pv.Spec.AccessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
 	pv.Spec.PersistentVolumeReclaimPolicy = reclaimPolicy
-	pv.Spec.StorageClassName = storageClass
+	pv.Spec.StorageClassName = f.GetStorageClass()
 	pv.Spec.Local = &corev1.LocalVolumeSource{
 		Path: f.Spec.MountPath,
 	}
@@ -67,6 +68,17 @@ func (f *Filesystem) AsPv(storageClass string) *corev1.PersistentVolume {
 		}}
 
 	return pv
+}
+
+func (f *Filesystem) GetStorageClass() string {
+	if f.Spec.StorageClass == "" {
+		return "local-storage"
+	}
+	return f.Spec.StorageClass
+}
+
+func (f *Filesystem) SetStorageClass(storageClass string) {
+	f.Spec.StorageClass = storageClass
 }
 
 func (f *Filesystem) GetEnv(prefix string) []corev1.EnvVar {
