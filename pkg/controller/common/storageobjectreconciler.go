@@ -18,6 +18,7 @@ type StorageObject interface {
 	SetPreparePhase(v1alpha1.StoragePreparePhase)
 	GetPreparePhase() v1alpha1.StoragePreparePhase
 	GetLabels() map[string]string
+	GetEnabled() bool
 	runtime.Object
 }
 
@@ -30,6 +31,11 @@ func NewStorageObjectReconciler(c client.Client) *StorageObjectReconciler {
 }
 
 func (r *StorageObjectReconciler) Reconcile(obj StorageObject) (reconcile.Result, error) {
+
+	if !obj.GetEnabled() {
+		return reconcile.Result{}, nil
+	}
+
 	if obj.GetPreparePhase() == v1alpha1.StoragePreparePhasePrepared {
 		return reconcile.Result{}, r.createManagedPv(obj)
 	}

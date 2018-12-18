@@ -99,6 +99,10 @@ func (f *Filesystem) IsMountable() bool {
 	return f.Spec.MountEnabled
 }
 
+func (f *Filesystem) GetEnabled() bool {
+	return f.IsMountable()
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Filesystem is the Schema for the filesystems API

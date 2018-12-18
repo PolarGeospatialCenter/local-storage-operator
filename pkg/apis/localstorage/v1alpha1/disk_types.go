@@ -19,6 +19,7 @@ type DiskSpec struct {
 	Info         DiskInfo     `json:"diskInfo"`
 	Location     DiskLocation `json:"location"`
 	StorageClass string       `json:"storageClass"`
+	Enabled      bool         `json:"enabled"`
 }
 
 type DiskInfo struct {
@@ -241,6 +242,10 @@ func (d *Disk) GetPreparePhase() StoragePreparePhase {
 
 func (d *Disk) SetPreparePhase(phase StoragePreparePhase) {
 	d.Status.PreparePhase = phase
+}
+
+func (d *Disk) GetEnabled() bool {
+	return d.Spec.Enabled
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
