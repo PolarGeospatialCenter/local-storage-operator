@@ -12,27 +12,38 @@ spec:
   version: v1alpha1
   scope: Cluster
   additionalPrinterColumns:
-  - name: Node
-    type: string
-    description: The node containing the disk
-    JSONPath: .spec.location.node
-  - name: Backplane
-    type: string
-    description: The backplane containing the disk
-    JSONPath: .spec.location.backplane
-  - name: Slot
-    type: string
-    description: The slot containing the disk
-    JSONPath: .spec.location.slot
   - name: Model
     type: string
     description: The model number of the disk
     JSONPath: .spec.diskInfo.model
+    priority: 0
   - name: SerialNumber
     type: string
     description: The serial number of the disk
     JSONPath: .spec.diskInfo.serialNumber
+    priority: 3
   - name: PreparePhase
     type: string
     description: The PrepareStatus of the disk
     JSONPath: .status.preparePhase
+    priority: 0
+  - name: Node
+    type: string
+    description: The node containing the disk
+    JSONPath: .spec.location.node
+    priority: 1
+  - name: Backplane
+    type: string
+    description: The backplane containing the disk
+    JSONPath: .spec.location.backplane
+    priority: 1
+  - name: Slot
+    type: string
+    description: The slot containing the disk
+    JSONPath: .spec.location.slot
+    priority: 1
+  - name: Capacity
+    type: string
+    description: The capacity of the disk
+    JSONPath: .spec.diskInfo.capacity
+    priority: 2
