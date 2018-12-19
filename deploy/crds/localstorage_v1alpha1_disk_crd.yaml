@@ -9,5 +9,30 @@ spec:
     listKind: DiskList
     plural: disks
     singular: disk
-  scope: Cluster
   version: v1alpha1
+  scope: Cluster
+  additionalPrinterColumns:
+  - name: Node
+    type: string
+    description: The node containing the disk
+    JSONPath: .spec.location.node
+  - name: Backplane
+    type: string
+    description: The backplane containing the disk
+    JSONPath: .spec.location.backplane
+  - name: Slot
+    type: string
+    description: The slot containing the disk
+    JSONPath: .spec.location.slot
+  - name: Model
+    type: string
+    description: The model number of the disk
+    JSONPath: .spec.diskInfo.model
+  - name: SerialNumber
+    type: string
+    description: The serial number of the disk
+    JSONPath: .spec.diskInfo.serialNumber
+  - name: PreparePhase
+    type: string
+    description: The PrepareStatus of the disk
+    JSONPath: .status.preparePhase
