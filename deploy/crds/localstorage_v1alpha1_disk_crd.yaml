@@ -22,6 +22,11 @@ spec:
     description: The serial number of the disk
     JSONPath: .spec.diskInfo.serialNumber
     priority: 3
+  - name: Enabled
+    type: boolean
+    description: The enabled status of the disk
+    JSONPath: .spec.enabled
+    priority: 0
   - name: PreparePhase
     type: string
     description: The PrepareStatus of the disk
