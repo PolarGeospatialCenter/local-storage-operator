@@ -39,6 +39,11 @@ func (f *Filesystem) AsPv() *corev1.PersistentVolume {
 
 	pv.Name = f.GetName()
 	pv.Labels = f.GetLabels()
+
+	for k, v := range f.getUniquePvLabels() {
+		pv.Labels[k] = v
+	}
+
 	pv.Annotations = f.GetAnnotations()
 	pv.Spec.Capacity = corev1.ResourceList{
 		corev1.ResourceStorage: f.Spec.Capacity,
@@ -68,6 +73,19 @@ func (f *Filesystem) AsPv() *corev1.PersistentVolume {
 		}}
 
 	return pv
+}
+
+func (f *Filesystem) getUniquePvLabels() map[string]string {
+	return map[string]string{
+		"localStorageObjectType": "filesystem",
+		"localStorageObjectName": f.GetName(),
+	}
+}
+
+func (f *Filesystem) GetPvLabelSelector() *metav1.LabelSelector {
+	return &metav1.LabelSelector{
+		MatchLabels: f.getUniquePvLabels(),
+	}
 }
 
 func (f *Filesystem) GetStorageClass() string {

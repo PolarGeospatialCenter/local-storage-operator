@@ -51,6 +51,7 @@ type PreparableStorageObject interface {
 	SetStorageClass(string)
 	GetName() string
 	GetEnv(string) []corev1.EnvVar
+	GetPvLabelSelector() *metav1.LabelSelector
 }
 
 func NewStoragePrepareJob(template *StoragePrepareJobTemplate, d PreparableStorageObject, namespace string) *StoragePrepareJob {
@@ -79,6 +80,14 @@ func NewStoragePrepareJob(template *StoragePrepareJobTemplate, d PreparableStora
 
 	for i, _ := range job.Spec.Template.Spec.Containers {
 		job.Spec.Template.Spec.Containers[i].Env = append(job.Spec.Template.Spec.Containers[i].Env, d.GetEnv("STORAGE")...)
+		ls := d.GetPvLabelSelector()
+		job.Spec.Template.Spec.Containers[i].Env = append(job.Spec.Template.Spec.Containers[i].Env,
+			corev1.EnvVar{
+				Name:  "PV_LABEL_SELECTOR",
+				Value: metav1.FormatLabelSelector(ls),
+			},
+		)
+
 	}
 
 	spj.Spec.Job = *job

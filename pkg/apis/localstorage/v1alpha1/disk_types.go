@@ -174,6 +174,11 @@ func (d *Disk) AsPv() *corev1.PersistentVolume {
 
 	pv.Name = d.Name()
 	pv.Labels = d.GetLabels()
+
+	for k, v := range d.getUniquePvLabels() {
+		pv.Labels[k] = v
+	}
+
 	pv.Annotations = d.GetAnnotations()
 	pv.Spec.Capacity = corev1.ResourceList{
 		corev1.ResourceStorage: d.Spec.Info.Capacity,
@@ -234,6 +239,19 @@ func (d *Disk) GetEnv(prefix string) []corev1.EnvVar {
 	})
 
 	return result
+}
+
+func (d *Disk) getUniquePvLabels() map[string]string {
+	return map[string]string{
+		"localStorageObjectType": "disk",
+		"localStorageObjectName": d.GetName(),
+	}
+}
+
+func (d *Disk) GetPvLabelSelector() *metav1.LabelSelector {
+	return &metav1.LabelSelector{
+		MatchLabels: d.getUniquePvLabels(),
+	}
 }
 
 func (d *Disk) GetPreparePhase() StoragePreparePhase {
