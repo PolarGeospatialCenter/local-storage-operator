@@ -11,3 +11,39 @@ spec:
     singular: filesystem
   scope: Cluster
   version: v1alpha1
+  additionalPrinterColumns:
+  - name: Type
+    type: string
+    description: The type of the filesystem
+    JSONPath: .spec.type
+    priority: 2
+  - name: Capacity
+    type: string
+    description: The capacity of the filesystem
+    JSONPath: .spec.capacity
+    priority: 2
+  - name: PreparePhase
+    type: string
+    description: The PrepareStatus of the disk
+    JSONPath: .status.preparePhase
+    priority: 0
+  - name: MountEnabled
+    type: boolean
+    description: Whether mounting of the filesystem is enabled or not.
+    JSONPath: .spec.mountEnabled
+    priority: 0
+  - name: Mounted
+    type: string
+    description: Whether the filesystem is currently mounted or not.
+    JSONPath: .status.mounted
+    priority: 0
+  - name: Node
+    type: string
+    description: The node containing the filesystem
+    JSONPath: .spec.nodeName
+    priority: 1
+  - name: DevicePath
+    type: string
+    description: The node containing the filesystem
+    JSONPath: .spec.device
+    priority: 1
