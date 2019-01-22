@@ -139,8 +139,8 @@ func (r *StorageObjectReconciler) prepareStorage(obj StorageObject) error {
 			return fmt.Errorf("no suitable StoragePrepareJobTemplate found.  This shouldn't happen, did you delete or update one?")
 		}
 
-		prepJob := v1alpha1.NewStoragePrepareJob(prepJobTemplate, obj, prepJobTemplate.Namespace)
-		err = r.client.Get(context.TODO(), types.NamespacedName{Namespace: prepJobTemplate.Namespace, Name: prepJob.Name}, prepJob)
+		prepJob := &v1alpha1.StoragePrepareJob{}
+		err = r.client.Get(context.TODO(), types.NamespacedName{Namespace: prepJobTemplate.Namespace, Name: obj.GetName()}, prepJob)
 		if err != nil {
 			return err
 		}

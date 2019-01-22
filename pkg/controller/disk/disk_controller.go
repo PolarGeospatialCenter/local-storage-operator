@@ -50,9 +50,17 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// TODO(user): Modify this to be the types you create that are owned by the primary resource
-	// Watch for changes to secondary resource Pods and requeue the owner Disk
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
+	// Watch for changes to secondary resource StoragePrepareJob and requeue the owner Disk
+	err = c.Watch(&source.Kind{Type: &localstoragev1alpha1.StoragePrepareJob{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &localstoragev1alpha1.Disk{},
+	})
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to secondary resource PersistentVolume and requeue the owner Disk
+	err = c.Watch(&source.Kind{Type: &corev1.PersistentVolume{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &localstoragev1alpha1.Disk{},
 	})
