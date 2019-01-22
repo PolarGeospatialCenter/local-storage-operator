@@ -94,7 +94,7 @@ func (r *ReconcileFilesystem) Reconcile(request reconcile.Request) (reconcile.Re
 
 	// Fetch the Filesystem instance
 	instance := &localstoragev1alpha1.Filesystem{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: request.Name}, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
