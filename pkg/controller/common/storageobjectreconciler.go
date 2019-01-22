@@ -130,7 +130,6 @@ func (r *StorageObjectReconciler) prepareStorage(obj StorageObject) error {
 
 	case v1alpha1.StoragePreparePhasePreparing:
 		prepJobTemplate, err := r.lookupPrepareJobTemplate(obj)
-
 		if err != nil {
 			return err
 		}
@@ -152,15 +151,36 @@ func (r *StorageObjectReconciler) prepareStorage(obj StorageObject) error {
 			obj.SetPreparePhase(v1alpha1.StoragePreparePhaseFailed)
 			return r.client.Update(context.TODO(), obj)
 		case v1alpha1.StoragePrepareJobPhaseSucceeded:
-			err = r.client.Delete(context.TODO(), prepJob, client.PropagationPolicy(metav1.DeletePropagationForeground))
+			err = r.client.Delete(context.TODO(), prepJob, client.PropagationPolicy(metav1.DeletePropagationBackground))
 			if err != nil {
 				obj.SetPreparePhase(v1alpha1.StoragePreparePhaseFailed)
 				r.client.Update(context.TODO(), obj)
 				return fmt.Errorf("error deleting StoragePrepareJob %s: %v", prepJob.GetName(), err)
 			}
+			obj.SetPreparePhase(v1alpha1.StoragePreparePhaseCleanup)
+			return r.client.Update(context.TODO(), obj)
+		}
+
+	case v1alpha1.StoragePreparePhaseCleanup:
+		prepJobTemplate, err := r.lookupPrepareJobTemplate(obj)
+		if err != nil {
+			return err
+		}
+
+		if prepJobTemplate == nil {
+			return fmt.Errorf("no suitable StoragePrepareJobTemplate found.  This shouldn't happen, did you delete or update one?")
+		}
+
+		prepJob := &v1alpha1.StoragePrepareJob{}
+		err = r.client.Get(context.TODO(), types.NamespacedName{Namespace: prepJobTemplate.Namespace, Name: obj.GetName()}, prepJob)
+
+		if errors.IsNotFound(err) {
 			obj.SetPreparePhase(v1alpha1.StoragePreparePhasePrepared)
 			return r.client.Update(context.TODO(), obj)
 		}
+
+		return err
+
 	case v1alpha1.StoragePreparePhaseFailed:
 		return nil
 	}
