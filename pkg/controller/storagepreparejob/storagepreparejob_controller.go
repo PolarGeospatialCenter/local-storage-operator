@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -99,9 +100,11 @@ func (r *ReconcileStoragePrepareJob) Reconcile(request reconcile.Request) (recon
 
 	switch instance.Status.Phase {
 	case localstoragev1alpha1.StoragePrepareJobPhasePending:
-		instance.UpdateOwnerReferences()
 
 		for _, object := range instance.GetObjects() {
+			if err = controllerutil.SetControllerReference(instance, object, r.scheme); err != nil {
+				return reconcile.Result{}, err
+			}
 			err := r.client.Create(context.TODO(), object)
 			if err != nil {
 				return reconcile.Result{}, fmt.Errorf("error creating %s while preparing %s: %v", object.GetObjectKind(), instance.GetName(), err)

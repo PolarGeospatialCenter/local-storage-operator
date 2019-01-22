@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -17,17 +18,17 @@ type StorageObject interface {
 	v1alpha1.PreparableStorageObject
 	SetPreparePhase(v1alpha1.StoragePreparePhase)
 	GetPreparePhase() v1alpha1.StoragePreparePhase
-	GetLabels() map[string]string
 	GetEnabled() bool
 	runtime.Object
 }
 
 type StorageObjectReconciler struct {
 	client client.Client
+	scheme *runtime.Scheme
 }
 
-func NewStorageObjectReconciler(c client.Client) *StorageObjectReconciler {
-	return &StorageObjectReconciler{client: c}
+func NewStorageObjectReconciler(c client.Client, s *runtime.Scheme) *StorageObjectReconciler {
+	return &StorageObjectReconciler{client: c, scheme: s}
 }
 
 func (r *StorageObjectReconciler) Reconcile(obj StorageObject) (reconcile.Result, error) {
@@ -53,6 +54,9 @@ func (r *StorageObjectReconciler) createManagedPv(obj StorageObject) error {
 	notExists := errors.IsNotFound(err)
 
 	if notExists {
+		if err = controllerutil.SetControllerReference(obj, pv, r.scheme); err != nil {
+			return err
+		}
 		err = r.client.Create(context.TODO(), pv)
 		if err != nil {
 			return fmt.Errorf("Error creating new PV: %v", err)
@@ -69,6 +73,7 @@ func (r *StorageObjectReconciler) createManagedPv(obj StorageObject) error {
 			return fmt.Errorf("Error deleting existing PV: %v", err)
 		}
 	}
+
 	return nil
 }
 
@@ -101,6 +106,10 @@ func (r *StorageObjectReconciler) prepareStorage(obj StorageObject) error {
 		}
 
 		prepJob := v1alpha1.NewStoragePrepareJob(prepJobTemplate, obj, prepJobTemplate.Namespace)
+
+		if err = controllerutil.SetControllerReference(obj, prepJob, r.scheme); err != nil {
+			return err
+		}
 
 		err = r.client.Create(context.TODO(), prepJob)
 		if err != nil {
