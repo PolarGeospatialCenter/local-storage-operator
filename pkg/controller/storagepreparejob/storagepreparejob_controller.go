@@ -98,6 +98,7 @@ func (r *ReconcileStoragePrepareJob) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	}
 
+	reqLogger.Info("", "Job.phase", instance.Status.Phase)
 	switch instance.Status.Phase {
 	case localstoragev1alpha1.StoragePrepareJobPhasePending:
 

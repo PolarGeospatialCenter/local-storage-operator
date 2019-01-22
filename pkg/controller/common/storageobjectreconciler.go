@@ -12,7 +12,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
+
+var log = logf.Log.WithName("controller_storageobject")
 
 type StorageObject interface {
 	v1alpha1.PreparableStorageObject
@@ -32,6 +35,9 @@ func NewStorageObjectReconciler(c client.Client, s *runtime.Scheme) *StorageObje
 }
 
 func (r *StorageObjectReconciler) Reconcile(obj StorageObject) (reconcile.Result, error) {
+	reqLogger := log.WithValues("Object.Namespace", obj.GetNamespace(), "Object.Name", obj.GetName(),
+		"Object.type", obj.GetObjectKind(), "Object.phase", obj.GetPreparePhase())
+	reqLogger.Info("Reconciling Object")
 
 	if !obj.GetEnabled() {
 		return reconcile.Result{}, nil
