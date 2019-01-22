@@ -118,7 +118,7 @@ func (r *ReconcileStoragePrepareJob) Reconcile(request reconcile.Request) (recon
 
 	case localstoragev1alpha1.StoragePrepareJobPhaseRunning:
 		job := &instance.Spec.Job
-		err := r.client.Get(context.TODO(), request.NamespacedName, job)
+		err := r.client.Get(context.TODO(), types.NamespacedName{Name: job.GetName(), Namespace: request.Namespace}, job)
 		if err != nil {
 			return reconcile.Result{}, fmt.Errorf("Error getting job for %s even though status is running: %v", instance.Name, err)
 		}
