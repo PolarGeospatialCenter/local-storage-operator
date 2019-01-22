@@ -40,13 +40,28 @@ func (r *StorageObjectReconciler) Reconcile(obj StorageObject) (reconcile.Result
 	reqLogger.Info("Reconciling Object")
 
 	if !obj.GetEnabled() {
-		return reconcile.Result{}, nil
+		return reconcile.Result{}, r.deleteMangedPv(obj)
 	}
 
 	if obj.GetPreparePhase() == v1alpha1.StoragePreparePhasePrepared {
 		return reconcile.Result{}, r.createManagedPv(obj)
 	}
+
+	err := r.deleteMangedPv(obj)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
 	return reconcile.Result{}, r.prepareStorage(obj)
+}
+
+func (r *StorageObjectReconciler) deleteMangedPv(obj StorageObject) error {
+	pv := obj.AsPv()
+	err := r.client.Delete(context.TODO(), pv)
+	if err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("Error deleting existing PV: %v", err)
+	}
+
+	return nil
 }
 
 func (r *StorageObjectReconciler) createManagedPv(obj StorageObject) error {
