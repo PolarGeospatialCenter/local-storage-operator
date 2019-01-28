@@ -10,36 +10,58 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
+
+var log = logf.Log.WithName("controller_storageobject")
 
 type StorageObject interface {
 	v1alpha1.PreparableStorageObject
 	SetPreparePhase(v1alpha1.StoragePreparePhase)
 	GetPreparePhase() v1alpha1.StoragePreparePhase
-	GetLabels() map[string]string
 	GetEnabled() bool
 	runtime.Object
 }
 
 type StorageObjectReconciler struct {
 	client client.Client
+	scheme *runtime.Scheme
 }
 
-func NewStorageObjectReconciler(c client.Client) *StorageObjectReconciler {
-	return &StorageObjectReconciler{client: c}
+func NewStorageObjectReconciler(c client.Client, s *runtime.Scheme) *StorageObjectReconciler {
+	return &StorageObjectReconciler{client: c, scheme: s}
 }
 
 func (r *StorageObjectReconciler) Reconcile(obj StorageObject) (reconcile.Result, error) {
+	reqLogger := log.WithValues("Object.Namespace", obj.GetNamespace(), "Object.Name", obj.GetName(),
+		"Object.type", obj.GetObjectKind(), "Object.phase", obj.GetPreparePhase())
+	reqLogger.Info("Reconciling Object")
 
 	if !obj.GetEnabled() {
-		return reconcile.Result{}, nil
+		return reconcile.Result{}, r.deleteMangedPv(obj)
 	}
 
 	if obj.GetPreparePhase() == v1alpha1.StoragePreparePhasePrepared {
 		return reconcile.Result{}, r.createManagedPv(obj)
 	}
+
+	err := r.deleteMangedPv(obj)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
 	return reconcile.Result{}, r.prepareStorage(obj)
+}
+
+func (r *StorageObjectReconciler) deleteMangedPv(obj StorageObject) error {
+	pv := obj.AsPv()
+	err := r.client.Delete(context.TODO(), pv)
+	if err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("Error deleting existing PV: %v", err)
+	}
+
+	return nil
 }
 
 func (r *StorageObjectReconciler) createManagedPv(obj StorageObject) error {
@@ -53,6 +75,9 @@ func (r *StorageObjectReconciler) createManagedPv(obj StorageObject) error {
 	notExists := errors.IsNotFound(err)
 
 	if notExists {
+		if err = controllerutil.SetControllerReference(obj, pv, r.scheme); err != nil {
+			return err
+		}
 		err = r.client.Create(context.TODO(), pv)
 		if err != nil {
 			return fmt.Errorf("Error creating new PV: %v", err)
@@ -69,6 +94,7 @@ func (r *StorageObjectReconciler) createManagedPv(obj StorageObject) error {
 			return fmt.Errorf("Error deleting existing PV: %v", err)
 		}
 	}
+
 	return nil
 }
 
@@ -102,6 +128,10 @@ func (r *StorageObjectReconciler) prepareStorage(obj StorageObject) error {
 
 		prepJob := v1alpha1.NewStoragePrepareJob(prepJobTemplate, obj, prepJobTemplate.Namespace)
 
+		if err = controllerutil.SetControllerReference(obj, prepJob, r.scheme); err != nil {
+			return err
+		}
+
 		err = r.client.Create(context.TODO(), prepJob)
 		if err != nil {
 			return fmt.Errorf("Error creating storage prepare job: %v", err)
@@ -115,7 +145,6 @@ func (r *StorageObjectReconciler) prepareStorage(obj StorageObject) error {
 
 	case v1alpha1.StoragePreparePhasePreparing:
 		prepJobTemplate, err := r.lookupPrepareJobTemplate(obj)
-
 		if err != nil {
 			return err
 		}
@@ -124,8 +153,8 @@ func (r *StorageObjectReconciler) prepareStorage(obj StorageObject) error {
 			return fmt.Errorf("no suitable StoragePrepareJobTemplate found.  This shouldn't happen, did you delete or update one?")
 		}
 
-		prepJob := v1alpha1.NewStoragePrepareJob(prepJobTemplate, obj, prepJobTemplate.Namespace)
-		err = r.client.Get(context.TODO(), types.NamespacedName{Namespace: prepJobTemplate.Namespace, Name: prepJob.Name}, prepJob)
+		prepJob := &v1alpha1.StoragePrepareJob{}
+		err = r.client.Get(context.TODO(), types.NamespacedName{Namespace: prepJobTemplate.Namespace, Name: obj.GetName()}, prepJob)
 		if err != nil {
 			return err
 		}
@@ -137,15 +166,36 @@ func (r *StorageObjectReconciler) prepareStorage(obj StorageObject) error {
 			obj.SetPreparePhase(v1alpha1.StoragePreparePhaseFailed)
 			return r.client.Update(context.TODO(), obj)
 		case v1alpha1.StoragePrepareJobPhaseSucceeded:
-			err = r.client.Delete(context.TODO(), prepJob, client.PropagationPolicy(metav1.DeletePropagationForeground))
+			err = r.client.Delete(context.TODO(), prepJob, client.PropagationPolicy(metav1.DeletePropagationBackground))
 			if err != nil {
 				obj.SetPreparePhase(v1alpha1.StoragePreparePhaseFailed)
 				r.client.Update(context.TODO(), obj)
 				return fmt.Errorf("error deleting StoragePrepareJob %s: %v", prepJob.GetName(), err)
 			}
+			obj.SetPreparePhase(v1alpha1.StoragePreparePhaseCleanup)
+			return r.client.Update(context.TODO(), obj)
+		}
+
+	case v1alpha1.StoragePreparePhaseCleanup:
+		prepJobTemplate, err := r.lookupPrepareJobTemplate(obj)
+		if err != nil {
+			return err
+		}
+
+		if prepJobTemplate == nil {
+			return fmt.Errorf("no suitable StoragePrepareJobTemplate found.  This shouldn't happen, did you delete or update one?")
+		}
+
+		prepJob := &v1alpha1.StoragePrepareJob{}
+		err = r.client.Get(context.TODO(), types.NamespacedName{Namespace: prepJobTemplate.Namespace, Name: obj.GetName()}, prepJob)
+
+		if errors.IsNotFound(err) {
 			obj.SetPreparePhase(v1alpha1.StoragePreparePhasePrepared)
 			return r.client.Update(context.TODO(), obj)
 		}
+
+		return err
+
 	case v1alpha1.StoragePreparePhaseFailed:
 		return nil
 	}

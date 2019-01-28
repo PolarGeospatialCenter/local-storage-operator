@@ -8,6 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -49,9 +50,17 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// TODO(user): Modify this to be the types you create that are owned by the primary resource
-	// Watch for changes to secondary resource Pods and requeue the owner Disk
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
+	// Watch for changes to secondary resource StoragePrepareJob and requeue the owner Disk
+	err = c.Watch(&source.Kind{Type: &localstoragev1alpha1.StoragePrepareJob{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &localstoragev1alpha1.Disk{},
+	})
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to secondary resource PersistentVolume and requeue the owner Disk
+	err = c.Watch(&source.Kind{Type: &corev1.PersistentVolume{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &localstoragev1alpha1.Disk{},
 	})
@@ -85,7 +94,7 @@ func (r *ReconcileDisk) Reconcile(request reconcile.Request) (reconcile.Result, 
 
 	// Fetch the Disk instance
 	instance := &localstoragev1alpha1.Disk{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: request.Name}, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -97,5 +106,5 @@ func (r *ReconcileDisk) Reconcile(request reconcile.Request) (reconcile.Result, 
 		return reconcile.Result{}, err
 	}
 
-	return common.NewStorageObjectReconciler(r.client).Reconcile(instance)
+	return common.NewStorageObjectReconciler(r.client, r.scheme).Reconcile(instance)
 }

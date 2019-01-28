@@ -47,9 +47,9 @@ type StoragePrepareJob struct {
 }
 
 type PreparableStorageObject interface {
+	metav1.Object
 	AsPv() *corev1.PersistentVolume
-	SetStorageClass(string)
-	GetName() string
+	GetStorageClass() string
 	GetEnv(string) []corev1.EnvVar
 	GetPvLabelSelector() *metav1.LabelSelector
 }
@@ -62,8 +62,9 @@ func NewStoragePrepareJob(template *StoragePrepareJobTemplate, d PreparableStora
 	spj.Namespace = namespace
 	spj.Status.Phase = "pending"
 
-	d.SetStorageClass("prepare-local-storage")
+	storageClass := fmt.Sprintf("prepare-%s", d.GetStorageClass())
 	prepPv := d.AsPv()
+	prepPv.Spec.StorageClassName = storageClass
 	prepPv.Name = fmt.Sprintf("prepare-%s", d.GetName())
 	prepPv.Labels = nil
 	prepPv.Annotations = nil
@@ -95,27 +96,13 @@ func NewStoragePrepareJob(template *StoragePrepareJobTemplate, d PreparableStora
 	return spj
 }
 
-func (s *StoragePrepareJob) UpdateOwnerReferences() error {
-
-	if s.UID == "" {
-		return fmt.Errorf("uid must not be set")
-	}
-
-	or := &metav1.OwnerReference{}
-	or.APIVersion = s.APIVersion
-	or.Kind = s.Kind
-	or.Name = s.Name
-	or.UID = s.UID
-
-	s.Spec.Pv.OwnerReferences = append(s.Spec.Pv.OwnerReferences, *or)
-	s.Spec.Pvc.OwnerReferences = append(s.Spec.Pvc.OwnerReferences, *or)
-	s.Spec.Job.OwnerReferences = append(s.Spec.Job.OwnerReferences, *or)
-
-	return nil
+type StoragePrepareObject interface {
+	runtime.Object
+	metav1.Object
 }
 
-func (s *StoragePrepareJob) GetObjects() []runtime.Object {
-	return []runtime.Object{
+func (s *StoragePrepareJob) GetObjects() []StoragePrepareObject {
+	return []StoragePrepareObject{
 		&s.Spec.Pv,
 		&s.Spec.Pvc,
 		&s.Spec.Job,

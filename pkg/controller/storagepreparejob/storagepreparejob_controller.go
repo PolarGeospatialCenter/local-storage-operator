@@ -5,11 +5,13 @@ import (
 	"fmt"
 
 	localstoragev1alpha1 "github.com/PolarGeospatialCenter/local-storage-operator/pkg/apis/localstorage/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -51,7 +53,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Pods and requeue the owner StoragePrepareJob
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
+	err = c.Watch(&source.Kind{Type: &batchv1.Job{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &localstoragev1alpha1.StoragePrepareJob{},
 	})
@@ -97,11 +99,14 @@ func (r *ReconcileStoragePrepareJob) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	}
 
+	reqLogger.Info("", "Job.phase", instance.Status.Phase)
 	switch instance.Status.Phase {
 	case localstoragev1alpha1.StoragePrepareJobPhasePending:
-		instance.UpdateOwnerReferences()
 
 		for _, object := range instance.GetObjects() {
+			if err = controllerutil.SetControllerReference(instance, object, r.scheme); err != nil {
+				return reconcile.Result{}, err
+			}
 			err := r.client.Create(context.TODO(), object)
 			if err != nil {
 				return reconcile.Result{}, fmt.Errorf("error creating %s while preparing %s: %v", object.GetObjectKind(), instance.GetName(), err)
@@ -113,7 +118,7 @@ func (r *ReconcileStoragePrepareJob) Reconcile(request reconcile.Request) (recon
 
 	case localstoragev1alpha1.StoragePrepareJobPhaseRunning:
 		job := &instance.Spec.Job
-		err := r.client.Get(context.TODO(), request.NamespacedName, job)
+		err := r.client.Get(context.TODO(), types.NamespacedName{Name: job.GetName(), Namespace: request.Namespace}, job)
 		if err != nil {
 			return reconcile.Result{}, fmt.Errorf("Error getting job for %s even though status is running: %v", instance.Name, err)
 		}
