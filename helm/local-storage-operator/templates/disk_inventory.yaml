@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: "{{ include "local-storage-operator.fullname" . }}-disk-inventory"
+  namespace: {{ .Values.namespace}}
+  labels:
+    app.kubernetes.io/name: {{ include "local-storage-operator.name" . }}
+    helm.sh/chart: {{ include "local-storage-operator.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  selector:
+    matchLabels:
+      app: disk-inventory
+      app.kubernetes.io/name: {{ include "local-storage-operator.name" . }}
+      helm.sh/chart: {{ include "local-storage-operator.chart" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/managed-by: {{ .Release.Service }}
+  template:
+    metadata:
+      name: "{{ include "local-storage-operator.fullname" . }}-disk-inventory"
+      labels:
+        app: disk-inventory
+        app.kubernetes.io/name: {{ include "local-storage-operator.name" . }}
+        helm.sh/chart: {{ include "local-storage-operator.chart" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+    spec:
+      serviceAccount: "disk-inventory-{{ .Release.Name }}"
+      {{- with .Values.diskInventory.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name:  disk-inventory
+        image: "{{ .Values.diskInventory.image.repository }}:{{ .Values.diskInventory.image.tag }}"
+        imagePullPolicy: {{ .Values.diskInventory.image.pullPolicy }}
+        env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+        volumeMounts:
+          - name: udev
+            mountPath: /run/udev
+      volumes:
+        - name: udev
+          hostPath:
+            path: /run/udev

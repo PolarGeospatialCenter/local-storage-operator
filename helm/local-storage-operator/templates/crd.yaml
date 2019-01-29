@@ -1,0 +1,9 @@
+{{- if (not (.Capabilities.APIVersions.Has "localstorage.k8s.pgc.umn.edu/v1alpha1")) }}
+{{ .Files.Get "crd/localstorage_v1alpha1_disk_crd.yaml" }}
+---
+{{ .Files.Get "crd/localstorage_v1alpha1_filesystem_crd.yaml" }}
+---
+{{ .Files.Get "crd/localstorage_v1alpha1_storagepreparejob_crd.yaml" }}
+---
+{{ .Files.Get "crd/localstorage_v1alpha1_storagepreparejobtemplate_crd.yaml" }}
+{{- end }}

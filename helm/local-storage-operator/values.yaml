@@ -1,0 +1,37 @@
+# Default values for local-storage-operator.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+namespace: local-storage
+
+diskInventory:
+  nodeSelector:
+    diskInventory: "true"
+  image:
+    repository: quay.io/polargeospatialcenter/disk-inventory
+    tag: latest
+    pullPolicy: Always
+
+filesystemMounter:
+  nodeSelector:
+    filesystemMounter: "true"
+  image:
+    repository: quay.io/polargeospatialcenter/filesystem-mounter
+    tag: latest
+    pullPolicy: Always
+
+operator:
+  image:
+    repository: quay.io/polargeospatialcenter/local-storage-operator
+    tag: latest
+    pullPolicy: Always
+  serviceaccount:
+    name: local-storage-operator
+    role: local-storage-operator
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+nameOverride: ""
+fullnameOverride: ""

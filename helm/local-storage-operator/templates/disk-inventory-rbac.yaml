@@ -1,0 +1,36 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: "disk-inventory-{{ .Release.Name }}"
+rules:
+- apiGroups:
+  - localstorage.k8s.pgc.umn.edu
+  resources:
+  - disks
+  verbs:
+  - '*'
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: disk-inventory
+subjects:
+- kind: ServiceAccount
+  name: "disk-inventory-{{ .Release.Name }}"
+  namespace: {{ .Values.namespace}}
+roleRef:
+  kind: ClusterRole
+  name: "disk-inventory-{{ .Release.Name }}"
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: "disk-inventory-{{ .Release.Name }}"
+  namespace: {{ .Values.namespace}}
+  labels:
+    app.kubernetes.io/name: {{ include "local-storage-operator.name" . }}
+    helm.sh/chart: {{ include "local-storage-operator.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
